@@ -8,17 +8,17 @@ var Promise = require('bluebird');
 var configFileName = '.notepad-replacer';
 var configFilePath = path.join(osenv.home(), configFileName);
 var dummyMarker = '-3qlsvw92';
-  
+
 function getAbsolutePathToScript() {
-  var promise = new Promise(function(resolve, reject) {
+  var promise = new Promise(function (resolve, reject) {
     var exec = require('child_process').exec;
-    exec("npm config get prefix", function(err, stdout, stderr) {
-        if (!err) {
-          resolve(stdout.replace(/(\r\n|\n|\r)/gm,"") + "\\notepad-replacer.cmd");
-        }
-        else {
-          reject(err);
-        }
+    exec("npm config get prefix", function (err, stdout, stderr) {
+      if (!err) {
+        resolve(stdout.replace(/(\r\n|\n|\r)/gm, "") + "\\notepad-replacer.cmd");
+      }
+      else {
+        reject(err);
+      }
     });
   });
 
@@ -30,16 +30,16 @@ function installRegKey(scriptPath) {
   var putValue = Promise.promisify(require('regedit').putValue);
 
   return createKey('HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\notepad.exe').
-    then(function() {
-      return putValue({
-        'HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\notepad.exe': {
-          'Debugger': {
-            value: scriptPath + ' ' + dummyMarker,
-            type: 'REG_SZ'
-          }
+    then(function () {
+    return putValue({
+      'HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\notepad.exe': {
+        'Debugger': {
+          value: scriptPath + ' ' + dummyMarker,
+          type: 'REG_SZ'
         }
-      });
+      }
     });
+  });
 }
 
 function uninstallRegKey() {
@@ -47,7 +47,7 @@ function uninstallRegKey() {
 
   return deleteKey(
     'HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\notepad.exe'
-  );
+    );
 
 }
 
@@ -57,35 +57,35 @@ function uninstall() {
 }
 
 function install(exe) {
-    return saveConfig(exe)
+  return saveConfig(exe)
     .then(getAbsolutePathToScript)
-    .then(installRegKey);      
+    .then(installRegKey);
 }
 
 function saveConfig(exe) {
   if (!exe) {
     throw new Error('No replacement exe specified.');
   }
-  
+
   var writeFile = Promise.promisify(require("fs").writeFile);
-  return writeFile(configFilePath, JSON.stringify({exe: exe})); 
+  return writeFile(configFilePath, JSON.stringify({ exe: exe }));
 }
 
 function readConfig() {
   var readFile = Promise.promisify(require("fs").readFile);
 
   return readFile(configFilePath, "utf8")
-  .then(function(contents) {
+    .then(function (contents) {
     return JSON.parse(contents);
-  }, function(err) {    
-    throw new Error('Failed to read config file');
-  });
+  }, function (err) {
+      throw new Error('Failed to read config file');
+    });
 }
 
 function spawnTool(config, argv) {
   var args = [];
 
-  var promise = new Promise(function(resolve, reject) {
+  var promise = new Promise(function (resolve, reject) {
     if (argv.length >= 1) {
       if (argv[0] === 'node' && argv.length >= 2) {
         args = argv.slice(2);
@@ -102,8 +102,13 @@ function spawnTool(config, argv) {
 
     // console.log('invoking: '+ config.exe  + ' ARGS: ' + JSON.stringify(args));
 
-    var spawnSync = require('child_process').spawnSync;  
-    spawnSync(config.exe, args, {detached: true});
+    var spawn = require('child_process').spawn;
+
+    var child = spawn(config.exe, args, {
+      detached: true
+    });
+
+    child.unref();
     resolve();
   });
 
@@ -112,12 +117,11 @@ function spawnTool(config, argv) {
 
 function invoke(argv) {
   return readConfig()
-    .then(function(config) {
-      return spawnTool(config, argv);
-    });
+    .then(function (config) {
+    return spawnTool(config, argv);
+  });
 }
 
 module.exports.install = install;
 module.exports.uninstall = uninstall;
 module.exports.invoke = invoke;
-module.exports.getLogFileLocation = getLogFileLocation;
