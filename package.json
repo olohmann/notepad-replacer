@@ -1,0 +1,36 @@
+{
+  "name": "notepad-replacer",
+  "version": "0.1.0",
+  "description": "Replaces calls to notepad.exe with calls to your favorite editor.",
+  "main": "index.js",
+  "bin": {
+    "notepad-replacer": "cli.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/olohmann/notepad-replacer.git"
+  },
+  "files": [
+    "index.js",
+    "cli.js"
+  ],
+  "keywords": [
+    "cli-app",
+    "cli",
+    "bin",
+    "win",
+    "windows"
+  ],
+  "engines": {
+    "node": ">= 0.10.x"
+  },
+  "author": "Oliver Lohmann",
+  "license": "MIT",
+  "dependencies": {
+    "bluebird": "^2.9.24",
+    "chalk": "^1.0.0",
+    "meow": "^3.1.0",
+    "osenv": "^0.1.0",
+    "regedit": "^2.2.5"
+  }
+}
