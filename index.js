@@ -105,6 +105,7 @@ function spawnTool(config, argv) {
     var spawn = require('child_process').spawn;
 
     var child = spawn(config.exe, args, {
+      stdio: 'ignore',
       detached: true
     });
 
