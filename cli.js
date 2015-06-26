@@ -26,7 +26,6 @@ if (cli.flags.contextmenu && !cli.flags.install) {
 } else if (cli.flags.uninstall) {
   promise = notepadReplacer.uninstall();
 } else {
-  console.dir(process.argv);
   promise = notepadReplacer.invoke(process.argv);
 }
 
