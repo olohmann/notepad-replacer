@@ -26,6 +26,11 @@ notepad.exe foo.txt
 
 And Sublime should open with a (new) file `foo.txt`.
 
+If you'd like to have context menu entries (files *and* directories):
+```bash
+notepad-replacer --install "C:\YOUR\PATH\TO\Sublime\sublime_editor.exe" --contextmenu "Open with Sublime"
+```
+
 If you change your mind later:
 ```bash
 notepad-replacer --uninstall

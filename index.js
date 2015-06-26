@@ -4,10 +4,15 @@ var fs = require('fs');
 var osenv = require('osenv');
 var path = require('path');
 var Promise = require('bluebird');
+var chalk = require('chalk');
 
 var configFileName = '.notepad-replacer';
 var configFilePath = path.join(osenv.home(), configFileName);
 var dummyMarker = '-3qlsvw92';
+
+var regKeyFile = 'HKCR\\*\\shell\\NotepadReplacer';
+var regKeyDirectory = 'HKCR\\Directory\\shell\\NotepadReplacer'; 
+var regKeyReplace = 'HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\notepad.exe'
 
 function getAbsolutePathToScript() {
   var promise = new Promise(function (resolve, reject) {
@@ -29,37 +34,122 @@ function installRegKey(scriptPath) {
   var createKey = Promise.promisify(require('regedit').createKey);
   var putValue = Promise.promisify(require('regedit').putValue);
 
-  return createKey('HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\notepad.exe').
+  var values = {};
+  values[regKeyReplace] = {
+    'Debugger': {
+      value: scriptPath + ' ' + dummyMarker,
+      type: 'REG_SZ'
+    }
+  };
+
+  return createKey(regKeyReplace).
     then(function () {
-    return putValue({
-      'HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\notepad.exe': {
-        'Debugger': {
-          value: scriptPath + ' ' + dummyMarker,
-          type: 'REG_SZ'
-        }
-      }
-    });
+    return putValue(values);
   });
+}
+
+function installContextmenuRegKey(exe, title) {
+  var createKey = Promise.promisify(require('regedit').createKey);
+  var putValue = Promise.promisify(require('regedit').putValue);
+  
+  var values = {};
+  
+  values[regKeyFile] = {
+    'Default': {
+      value: title,
+      type: 'REG_DEFAULT'
+    },
+    'Icon': {
+      value: exe,
+      type: 'REG_SZ'
+    }
+  };
+  
+  values[regKeyDirectory] = {
+    'Default': {
+      value: title,
+      type: 'REG_DEFAULT'
+    },
+    'Icon': {
+      value: exe,
+      type: 'REG_SZ'
+    }
+  };
+  
+  values[regKeyFile + '\\command'] = {
+    'Default': {
+      value: 'notepad.exe "%1"',
+      type: 'REG_DEFAULT'
+    }
+  };
+    
+  values[regKeyDirectory + '\\command'] = {
+    'Default': {
+      value: 'notepad.exe "%1"',
+      type: 'REG_DEFAULT'
+    }
+  };
+  
+  return createKey([
+      regKeyFile, 
+      regKeyFile + '\\command', 
+      regKeyDirectory, 
+      regKeyDirectory + '\\command'])
+    .then(function() {     
+      return putValue(values);
+    });  
+}
+
+function uninstallContextmenuRegKey() {
+  var deleteKey = Promise.promisify(require('regedit').deleteKey);
+
+  return deleteKey(regKeyFile + '\\command')
+      .then(function() {
+        return deleteKey(regKeyFile + '\\');
+      })
+      .then(function() {
+        return deleteKey(regKeyDirectory + '\\command');
+      })
+      .then(function() {
+        return deleteKey(regKeyDirectory + '\\');
+      }).catch(function(e) {
+        console.warn(e.cause);
+        console.warn(chalk.yellow('Context menu registry keys did not uninstall properly.'));
+      }); 
 }
 
 function uninstallRegKey() {
   var deleteKey = Promise.promisify(require('regedit').deleteKey);
-
-  return deleteKey(
-    'HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\notepad.exe'
-    );
-
+  
+  return deleteKey(regKeyReplace)
+    .catch(function(e) {
+        console.warn(e.cause);
+        console.warn(chalk.yellow('Registry key did not uninstall properly.'));
+    });;
 }
 
 function uninstall() {
   return getAbsolutePathToScript()
-    .then(uninstallRegKey);
+    .then(uninstallRegKey)
+    .then(uninstallContextmenuRegKey);
 }
 
-function install(exe) {
-  return saveConfig(exe)
+function install(exe, contextmenu) {
+  if (!fs.existsSync(exe)) {
+    throw new Error('Path "' + exe + '" does not exist.');
+  }
+  
+  var process = saveConfig(exe, contextmenu)
     .then(getAbsolutePathToScript)
     .then(installRegKey);
+    
+  if (contextmenu) {
+    process = process.then(function() { 
+      return installContextmenuRegKey(exe, contextmenu);
+    });
+  }
+  
+  return process;
 }
 
 function saveConfig(exe) {
@@ -68,7 +158,7 @@ function saveConfig(exe) {
   }
 
   var writeFile = Promise.promisify(require("fs").writeFile);
-  return writeFile(configFilePath, JSON.stringify({ exe: exe }));
+  return writeFile(configFilePath, JSON.stringify({ exe: exe}));
 }
 
 function readConfig() {
@@ -95,12 +185,13 @@ function spawnTool(config, argv) {
     }
 
     if (args.length >= 1) {
+      // Remove marker parameter (Registry Detour Entry)
       if (args[0] === dummyMarker) {
         args = args.slice(2);
       }
+      
+      args = [args.join(' ')];
     }
-
-    // console.log('invoking: '+ config.exe  + ' ARGS: ' + JSON.stringify(args));
 
     var spawn = require('child_process').spawn;
 
@@ -125,4 +216,5 @@ function invoke(argv) {
 
 module.exports.install = install;
 module.exports.uninstall = uninstall;
+
 module.exports.invoke = invoke;
