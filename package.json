@@ -1,6 +1,6 @@
 {
   "name": "notepad-replacer",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Replaces calls to notepad.exe with calls to your favorite editor.",
   "main": "index.js",
   "bin": {
