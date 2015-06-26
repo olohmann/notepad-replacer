@@ -6,13 +6,42 @@ var path = require('path');
 var Promise = require('bluebird');
 var chalk = require('chalk');
 
-var configFileName = '.notepad-replacer';
-var configFilePath = path.join(osenv.home(), configFileName);
+var configDirName = '.notepad-replacer';
+var configFileName = 'config.json';
+var vbsFileName = 'invis.vbs';
+
+var configDirPath = path.join(osenv.home(), configDirName);
+var configFilePath = path.join(configDirPath, configFileName);
+var vbsPath = path.join(configDirPath, vbsFileName);
+
 var dummyMarker = '-3qlsvw92';
 
 var regKeyFile = 'HKCR\\*\\shell\\NotepadReplacer';
 var regKeyDirectory = 'HKCR\\Directory\\shell\\NotepadReplacer'; 
-var regKeyReplace = 'HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\notepad.exe'
+var regKeyReplace = 'HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\notepad.exe';
+
+var invisVbs = [
+'set args = WScript.Arguments',
+'num = args.Count',
+'',
+'if num = 0 then',
+'    WScript.Echo "Usage: [CScript | WScript] invis.vbs aScript.bat <some script arguments>"',
+'    WScript.Quit 1',
+'end if',
+'',
+'sargs = ""',
+'if num > 1 then',
+'    sargs = " "',
+'    for k = 1 to num - 1',
+'        anArg = args.Item(k)',
+'        sargs = sargs & anArg & " "',
+'    next',
+'end if',
+'',
+'Set WshShell = WScript.CreateObject("WScript.Shell")',
+'',
+'WshShell.Run """" & WScript.Arguments(0) & """" & sargs, 0, False'  
+].join('\r\n');
 
 function getAbsolutePathToScript() {
   var promise = new Promise(function (resolve, reject) {
@@ -30,6 +59,17 @@ function getAbsolutePathToScript() {
   return promise;
 }
 
+function createConfigFolder() {
+  var mkdirp = Promise.promisify(require('mkdirp'));
+  
+  return mkdirp(configDirPath);
+}
+
+function installScript() {
+  var writeFile = Promise.promisify(require("fs").writeFile);
+  return writeFile(vbsPath, invisVbs);
+}
+
 function installRegKey(scriptPath) {
   var createKey = Promise.promisify(require('regedit').createKey);
   var putValue = Promise.promisify(require('regedit').putValue);
@@ -37,7 +77,7 @@ function installRegKey(scriptPath) {
   var values = {};
   values[regKeyReplace] = {
     'Debugger': {
-      value: scriptPath + ' ' + dummyMarker,
+      value: 'wscript.exe ' + vbsPath + ' ' + scriptPath + ' ' + dummyMarker,
       type: 'REG_SZ'
     }
   };
@@ -139,7 +179,11 @@ function install(exe, contextmenu) {
     throw new Error('Path "' + exe + '" does not exist.');
   }
   
-  var process = saveConfig(exe, contextmenu)
+  var process = createConfigFolder()
+    .then(function() {
+       return saveConfig(exe, contextmenu);
+    })
+    .then(installScript)
     .then(getAbsolutePathToScript)
     .then(installRegKey);
     
