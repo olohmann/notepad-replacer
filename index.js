@@ -221,7 +221,7 @@ function spawnTool(config, argv) {
 
   var promise = new Promise(function (resolve, reject) {
     if (argv.length >= 1) {
-      if (argv[0] === 'node' && argv.length >= 2) {
+      if (argv[0].indexOf('node') > -1 && argv.length >= 2) {
         args = argv.slice(2);
       } else {
         args = argv;
